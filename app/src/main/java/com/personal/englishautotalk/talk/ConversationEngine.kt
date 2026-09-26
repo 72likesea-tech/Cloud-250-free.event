@@ -1,0 +1,91 @@
+package com.personal.englishautotalk.talk
+
+/**
+ * 한 회차의 대화 상태: 메시지 이력, 고른 주제, 턴 수, 경과 시간, 완료·마무리 판단.
+ * requirements.md ④: 5분 이상 또는 8왕복 이상이면 완료 → 마무리, 10분이면 무조건 마무리.
+ */
+class ConversationEngine(
+    val debateQuestion: String,
+    private val clock: () -> Long,
+) {
+    enum class Phase(val apiName: String) { CHOOSE_TOPIC("choose_topic"), TALK("talk"), WRAP_UP("wrap_up") }
+
+    data class Message(val fromLearner: Boolean, val text: String)
+
+    private val startedAt = clock()
+    val messages = mutableListOf<Message>()
+    var chosenTopic: String? = null
+        private set
+    var learnerTurns = 0
+        private set
+
+    val elapsedMs get() = clock() - startedAt
+
+    fun addApp(text: String) {
+        messages += Message(fromLearner = false, text = text)
+    }
+
+    /** 한국어 도움 요청은 턴 수에 넣지 않고, 모델이 알아보도록 [HELP_KO] 표식을 붙인다. */
+    fun addLearner(text: String, koreanHelp: Boolean = false) {
+        if (koreanHelp) {
+            messages += Message(fromLearner = true, text = "$HELP_MARKER $text".trim())
+            return
+        }
+        learnerTurns++
+        messages += Message(fromLearner = true, text = text)
+        if (chosenTopic == null) chosenTopic = detectTopic(text, debateQuestion)
+    }
+
+    fun isComplete(): Boolean = elapsedMs >= COMPLETE_MS || learnerTurns >= COMPLETE_TURNS
+
+    /** 방금 들어온 사용자 턴에 대한 응답의 단계. */
+    fun phaseForReply(): Phase = when {
+        isComplete() || elapsedMs >= MAX_MS -> Phase.WRAP_UP
+        chosenTopic == null && learnerTurns < 3 -> Phase.CHOOSE_TOPIC
+        learnerTurns <= 1 -> Phase.CHOOSE_TOPIC
+        else -> Phase.TALK
+    }
+
+    fun systemPrompt(template: String, phase: Phase): String = template
+        .replace("{{debate_question}}", debateQuestion)
+        .replace("{{chosen_topic}}", chosenTopic ?: "not chosen yet")
+        .replace("{{elapsed_min}}", (elapsedMs / 60_000).toString())
+        .replace("{{turn_count}}", learnerTurns.toString())
+        .replace("{{phase}}", phase.apiName)
+
+    /** API로 보낼 최근 메시지. 첫 메시지가 사용자 역할이 되도록 시작 표식을 앞에 둔다. */
+    fun recentMessages(max: Int = MAX_MESSAGES): List<Message> =
+        listOf(Message(fromLearner = true, text = SESSION_START)) + messages.takeLast(max - 1)
+
+    fun transcript(): String = messages.joinToString("\n") { m ->
+        (if (m.fromLearner) "Learner: " else "Mia: ") + m.text
+    }
+
+    companion object {
+        const val HELP_MARKER = "[HELP_KO]"
+        const val SESSION_START = "[Session start. Mia speaks first.]"
+        const val COMPLETE_MS = 5 * 60_000L
+        const val MAX_MS = 10 * 60_000L
+        const val COMPLETE_TURNS = 8
+        const val MAX_MESSAGES = 20
+
+        private val workWords = Regex("""\b(work|job|business|office|company|meeting)s?\b""", RegexOption.IGNORE_CASE)
+        private val travelWords = Regex("""\b(travel|trip|vacation|holiday|traveling|travelling)s?\b""", RegexOption.IGNORE_CASE)
+        private val debateWords = Regex("""\b(question|debate|third|last one|that one|the last|number three)\b""", RegexOption.IGNORE_CASE)
+
+        private val commonWords = setOf("allowed", "important", "everyone", "something", "without", "another")
+
+        fun detectTopic(text: String, debateQuestion: String): String? {
+            // 토론 질문의 특징적인 단어(7자 이상, 흔한 단어 제외)를 말하면 토론 주제를 고른 것으로 본다.
+            val debateKeywords = debateQuestion.lowercase().split(Regex("[^a-z-]+"))
+                .filter { it.length >= 7 && it !in commonWords }
+            val lower = text.lowercase()
+            return when {
+                debateWords.containsMatchIn(text) || debateKeywords.any { it in lower } -> "debate"
+                workWords.containsMatchIn(text) -> "work"
+                travelWords.containsMatchIn(text) -> "travel"
+                else -> null
+            }
+        }
+    }
+}

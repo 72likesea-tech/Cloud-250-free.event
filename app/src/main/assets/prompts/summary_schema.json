@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "properties": {
+    "corrections": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {
+        "type": "object",
+        "properties": {
+          "said": {"type": "string"},
+          "better": {"type": "string"},
+          "note_ko": {"type": "string"}
+        },
+        "required": ["said", "better", "note_ko"]
+      }
+    },
+    "praise_en": {"type": "string"},
+    "review_expressions": {"type": "array", "items": {"type": "string"}, "maxItems": 3}
+  },
+  "required": ["corrections", "praise_en", "review_expressions"]
+}

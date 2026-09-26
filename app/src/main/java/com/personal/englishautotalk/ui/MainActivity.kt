@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text("영어자동말걸기", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("2단계 테스트 빌드 — 자동 말걸기와 첫 문장 음성 확인용", color = MaterialTheme.colorScheme.outline)
+                Text("3단계 테스트 빌드 — AI 영어 대화 한 회차", color = MaterialTheme.colorScheme.outline)
 
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
@@ -108,6 +108,8 @@ class MainActivity : ComponentActivity() {
                         Text("매일 14:00 · 패스/무응답 시 1시간 뒤 · 20:00까지", color = MaterialTheme.colorScheme.outline)
                     }
                 }
+
+                AiSettingsCard(ctx) { refresh++ }
 
                 Text("자동 시작에 필요한 설정", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 val needsRuntime = mutableListOf<String>()
@@ -162,8 +164,11 @@ class MainActivity : ComponentActivity() {
                 Text("테스트는 매일 일정(14:00)과 재시도에 영향을 주지 않습니다.", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
 
                 HorizontalDivider()
+                RecordsSection(ctx, refreshKey) { refresh++ }
+
+                HorizontalDivider()
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("기록", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("이벤트 기록", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     TextButton(onClick = { EventLog.clear(ctx); refresh++ }) { Text("지우기") }
                 }
                 if (log.isEmpty()) Text("아직 기록이 없습니다", color = MaterialTheme.colorScheme.outline)

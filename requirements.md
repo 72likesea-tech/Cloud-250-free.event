@@ -52,13 +52,13 @@
 - 자동 시작: 전체화면 인텐트 알림 + `setShowWhenLocked` / `setTurnScreenOn`. `USE_FULL_SCREEN_INTENT`는 사용자가 설정에서 직접 허용해야 할 수 있음. [확인 필요]
 - 음성: Android TextToSpeech(영어) / SpeechRecognizer. 오디오 라우팅은 이어폰 우선.
 - AI: Google Gemini API, 사용자가 기존에 만든 키를 앱 설정에서 입력. Android Keystore로 암호화, 백업 제외. [확정]
-  - 종료 후 요약·교정: `gemini-2.5-flash-lite`. [확정 — 무료 한도는 확인 필요]
-  - 대화 응답 모델: `gemini-2.5-flash-lite` [확정]
+  - 종료 후 요약·교정: 대화 모델과 동일(기본 `gemini-3.5-flash-lite`). [확정 — 2026-09-26 변경]
+  - 대화 응답 모델: 기본 `gemini-3.5-flash-lite`, 설정에서 변경 가능 [확정 — 2026-09-26 변경]
 - 저장: DataStore(설정·스케줄 상태) + Room(대화 기록).
 - 오프라인·한도 초과 시 기본 연습 콘텐츠(assets JSON, GPT 담당 산출물)로 전환.
 - 대화 콘텐츠: GPT 작업 1·3은 사용자 결정 (가)에 따라 Claude가 대신 작성 → `docs/content/task1-persona-openers.md`, `docs/content/task3-correction-rules.md`, 앱 데이터 `app/src/main/assets/content_pack.json`. 페르소나 Mia. [확정 — 2026-09-26]
 - Gemini 작업 A~D는 사용자 지시("제미나이의 역할까지 직접 실행")에 따라 Claude가 수행 → `docs/gemini/` (2026-09-26). API 키로 직접 호출하는 시험은 미실시.
-- **모델 주의 (작업 A):** 2026-09-18부터 2.5 계열은 과거 사용 프로젝트에만 제공, 새 프로젝트는 `gemini-3.5-flash-lite` 권장 [2차 자료로 공식 문구 인용 확인]. 앱은 모델을 설정에서 바꿀 수 있게 하고 연결 테스트로 확인한다. 기본값 [사용자 결정 대기].
+- **모델 주의 (작업 A):** 2026-09-18부터 2.5 계열은 과거 사용 프로젝트에만 제공, 새 프로젝트는 `gemini-3.5-flash-lite` 권장 [2차 자료로 공식 문구 인용 확인]. 앱은 모델을 설정에서 바꿀 수 있게 하고 연결 테스트로 확인한다. 기본값 `gemini-3.5-flash-lite`, 설정에서 `gemini-2.5-flash-lite` 등으로 변경 가능. [확정 — 2026-09-26 사용자 (가)]
 
 ## ⑥ 무료 한도와 월 비용 상한
 - 목표 월 0원. 결제가 연결되지 않은 기존 Gemini 키 사용을 전제. [확정 — 0원 필수]
@@ -70,7 +70,7 @@
 - 외부 전송: 음성을 글자로 바꾼 대화 텍스트만 Gemini API로 전송. 음성 원본은 보내지 않음(단, Android 음성 인식 자체가 Google 서버를 쓸 수 있음 — 기기 내 인식 지원 여부 [확인 필요]).
 - 기기 저장: 회차별 대화 텍스트, 교정 요약, 날짜·주제, 회차 결과(완료/패스/무응답/놓침).
 - 음성 원본 저장 안 함. 설정에 '기록 전체 삭제' 제공.
-- Gemini 무료 티어는 입력·응답을 Google 제품 개선에 사용하고 사람이 검토할 수 있음(Gemini API Additional Terms, 검색 요약 확인). 설정 화면에 "개인정보·회사 기밀은 말하지 마세요" 안내. [확정 — 사용자 동의 확인 필요]
+- Gemini 무료 티어는 입력·응답을 Google 제품 개선에 사용하고 사람이 검토할 수 있음(Gemini API Additional Terms, 검색 요약 확인). 설정 화면에 "개인정보·회사 기밀은 말하지 마세요" 안내. [확정 — 2026-09-26 사용자 동의]
 
 ## ⑧ 실제 기기 검수 기준
 작업지시서 6절 시나리오 + 추가 항목. 실기기 확인과 코드 검사를 구분해 기록.

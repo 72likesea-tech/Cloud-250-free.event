@@ -14,8 +14,8 @@ android {
         applicationId = "com.personal.englishautotalk"
         minSdk = 31
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.2-stage2"
+        versionCode = 4
+        versionName = "0.3.0-stage3"
     }
 
     signingConfigs {
@@ -64,4 +64,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
 
     testImplementation("junit:junit:4.13.2")
+    // 단위 테스트에서 Android 스텁 대신 실제 org.json 사용
+    testImplementation("org.json:json:20240303")
 }

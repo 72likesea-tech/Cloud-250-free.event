@@ -9,7 +9,11 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,8 +59,10 @@ class TalkActivity : ComponentActivity() {
 
         val mode = TalkMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: TalkMode.NORMAL.name)
         val test = intent.getBooleanExtra(AlarmScheduler.EXTRA_TEST, true)
-        val s = TalkSession(applicationContext, mode, test) {
-            handler.postDelayed({ finish() }, CLOSE_DELAY_MS)
+        lateinit var s: TalkSession
+        s = TalkSession(applicationContext, mode, test) {
+            // 교정 요약이 있으면 사용자가 읽고 닫을 때까지 두되, 너무 오래 켜져 있지 않게 한다.
+            handler.postDelayed({ finish() }, if (s.summary != null) SUMMARY_CLOSE_MS else CLOSE_DELAY_MS)
         }
         session = s
         setContent { AppTheme { TalkScreen(s) } }
@@ -89,6 +95,7 @@ class TalkActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_MODE = "mode"
         private const val CLOSE_DELAY_MS = 3_000L
+        private const val SUMMARY_CLOSE_MS = 3 * 60_000L
         private const val INTERRUPT_GRACE_MS = 1_500L
 
         fun intent(context: Context, mode: TalkMode, test: Boolean): Intent =
@@ -101,6 +108,7 @@ class TalkActivity : ComponentActivity() {
 
 @Composable
 private fun TalkScreen(session: TalkSession) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         if (session.phase == Phase.WAITING_TAP) {
             Box(
@@ -124,6 +132,11 @@ private fun TalkScreen(session: TalkSession) {
             return@Surface
         }
 
+        if (session.phase == Phase.ENDED && session.summary != null) {
+            SummaryScreen(session) { (context as? android.app.Activity)?.finish() }
+            return@Surface
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -136,7 +149,9 @@ private fun TalkScreen(session: TalkSession) {
                     Phase.PREPARING -> "준비 중…"
                     Phase.SPEAKING -> "🔊 말하는 중"
                     Phase.LISTENING -> "🎤 듣는 중 — 영어로 대답하세요"
-                    Phase.ENDED -> "종료"
+                    Phase.THINKING -> "💭 생각 중…"
+                    Phase.SUMMARIZING -> "📝 오늘의 교정 정리 중…"
+                    Phase.ENDED -> "종료 — ${session.outcome?.label.orEmpty()}"
                     Phase.WAITING_TAP -> ""
                 },
                 style = MaterialTheme.typography.titleLarge,
@@ -147,6 +162,17 @@ private fun TalkScreen(session: TalkSession) {
                 fontSize = 15.sp,
                 color = MaterialTheme.colorScheme.outline,
             )
+            session.basicModeReason?.let {
+                Text(
+                    "기본 연습 — AI 응답이 아닙니다 ($it)",
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    fontSize = 16.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .padding(8.dp),
+                )
+            }
             session.notice?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 18.sp)
             }
@@ -161,11 +187,18 @@ private fun TalkScreen(session: TalkSession) {
             ) {
                 items(session.lines) { line ->
                     Text(
-                        text = if (line.fromApp) line.text else "You: ${line.text}",
-                        fontSize = 28.sp,
-                        lineHeight = 36.sp,
-                        color = if (line.fromApp) MaterialTheme.colorScheme.onBackground
-                        else MaterialTheme.colorScheme.primary,
+                        text = when {
+                            line.hint -> "💡 ${line.text}"
+                            line.fromApp -> line.text
+                            else -> "You: ${line.text}"
+                        },
+                        fontSize = if (line.hint) 22.sp else 28.sp,
+                        lineHeight = if (line.hint) 30.sp else 36.sp,
+                        color = when {
+                            line.hint -> MaterialTheme.colorScheme.tertiary
+                            line.fromApp -> MaterialTheme.colorScheme.onBackground
+                            else -> MaterialTheme.colorScheme.primary
+                        },
                     )
                 }
                 if (session.partial.isNotBlank()) {
@@ -189,6 +222,39 @@ private fun ActionButtons(session: TalkSession) {
         }
         OutlinedButton(onClick = { session.skipToday() }, modifier = Modifier.weight(1f).height(72.dp)) {
             Text("오늘은 그만", fontSize = 20.sp)
+        }
+    }
+}
+
+@Composable
+private fun SummaryScreen(session: TalkSession, onClose: () -> Unit) {
+    val summary = session.summary ?: return
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("오늘의 교정 3개", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        summary.corrections.forEachIndexed { i, c ->
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("${i + 1}. 내가 한 말", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
+                    Text(c.said, fontSize = 20.sp)
+                    Text("더 자연스럽게", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
+                    Text(c.better, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(c.noteKo, fontSize = 17.sp)
+                }
+            }
+        }
+        if (summary.praise.isNotBlank()) Text(summary.praise, fontSize = 20.sp)
+        if (summary.reviewExpressions.isNotEmpty()) {
+            Text("다음에 써 볼 표현: " + summary.reviewExpressions.joinToString(" · "), fontSize = 16.sp)
+        }
+        Button(onClick = onClose, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+            Text("닫기", fontSize = 20.sp)
         }
     }
 }

@@ -5,7 +5,7 @@
 - 요구사항: [`requirements.md`](requirements.md)
 - 원본 문서: [`docs/work-order.md`](docs/work-order.md), [`docs/ai-role-prompts.md`](docs/ai-role-prompts.md)
 - 대화 콘텐츠: [`docs/content/`](docs/content) · Gemini 엔진 조사·사양: [`docs/gemini/`](docs/gemini)
-- 현재 단계 검수 안내: [`docs/stage2-test-guide.md`](docs/stage2-test-guide.md)
+- 검수 안내: [`docs/stage3-test-guide.md`](docs/stage3-test-guide.md) (현재) · [`docs/stage2-test-guide.md`](docs/stage2-test-guide.md)
 
 ## 빌드
 
@@ -27,7 +27,14 @@ Kotlin 2.2 · Jetpack Compose · AGP 8.13 · compile/target SDK 36 · minSdk 31.
 | `schedule/RestoreReceiver.kt` | 재부팅·시간 변경·업데이트 후 예약 복원 |
 | `talk/TalkNotifier.kt` | 전체화면 인텐트 알림으로 잠금화면 위에 대화 화면 표시 |
 | `talk/TalkActivity.kt`, `talk/TalkSession.kt` | 잠금화면 위 대화 화면, 말하기(TTS) → 듣기(STT) → 무응답 재말걸기 상태 머신 |
-| `ui/MainActivity.kt` | 다음 예약, 권한 상태·설정 안내, 검수용 테스트 버튼, 기록 |
+| `talk/TalkBrain.kt`, `talk/ConversationEngine.kt` | Gemini 응답·완료 판단(5분/8왕복, 10분 마무리), 오류 시 기본 연습 전환, 종료 요약 |
+| `talk/ContentPack.kt`, `assets/content_pack.json` | 오프닝·토론 질문·재말걸기·한국어 힌트 |
+| `talk/VoiceCommands.kt` | "I'm all set"/"Over to you" 끝 신호, "Help me in Korean"/한국어 감지 |
+| `ai/GeminiClient.kt`, `ai/GeminiProtocol.kt` | REST 호출·재시도(최대 2회), 요청/응답 JSON, 오류 분류 |
+| `ai/AiSettings.kt` | API 키 Keystore 암호화 저장, 모델 선택 |
+| `record/SessionStore.kt` | 회차 기록(기기 내 파일) |
+| `assets/prompts/` | 대화·요약 시스템 프롬프트, 요약 JSON 스키마 |
+| `ui/MainActivity.kt`, `ui/HomeSections.kt` | 다음 예약, AI 설정·연결 테스트, 권한 안내, 테스트 버튼, 대화 기록 |
 
 ## 서명
 `keystore/debug.keystore`는 테스트 빌드 전용 공용 디버그 키(비밀번호는 Android 기본값)다. 컨테이너가 바뀌어도 같은 서명으로 업데이트 설치가 되도록 저장소에 둔다. 최종 배포용 릴리스 키는 5단계에서 사용자가 별도로 만들고 저장소에 넣지 않는다.

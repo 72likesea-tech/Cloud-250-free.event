@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.speech.RecognitionListener
@@ -18,6 +19,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.personal.englishautotalk.ai.SessionSummary
+import com.personal.englishautotalk.record.SessionRecord
+import com.personal.englishautotalk.record.SessionStore
 import com.personal.englishautotalk.schedule.AlarmScheduler
 import com.personal.englishautotalk.schedule.SchedulePolicy
 import com.personal.englishautotalk.schedule.ScheduleStore
@@ -27,7 +31,7 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.util.Locale
 
-enum class Phase { WAITING_TAP, PREPARING, SPEAKING, LISTENING, ENDED }
+enum class Phase { WAITING_TAP, PREPARING, SPEAKING, LISTENING, THINKING, SUMMARIZING, ENDED }
 
 enum class Outcome(val label: String, val completesToday: Boolean) {
     ANSWERED("대화 완료", true),
@@ -39,7 +43,8 @@ enum class Outcome(val label: String, val completesToday: Boolean) {
     ERROR("오류로 종료 — 1시간 뒤 다시", false),
 }
 
-data class Line(val fromApp: Boolean, val text: String)
+/** hint = 소리 내어 읽지 않고 화면에만 보이는 한국어 힌트. */
+data class Line(val fromApp: Boolean, val text: String, val hint: Boolean = false)
 
 /**
  * 한 번의 말걸기 흐름: (방해금지면 터치 대기) → 첫 문장 음성 → 자동 듣기 →
@@ -60,9 +65,24 @@ class TalkSession(
     var partial by mutableStateOf("")
         private set
     val lines = mutableStateListOf<Line>()
+    /** 회차 종료 후 교정 요약. 있으면 화면이 닫히지 않고 요약을 보여준다. */
+    var summary by mutableStateOf<SessionSummary?>(null)
+        private set
+    /** 기본 연습(AI 아님)으로 바뀐 이유. null이면 AI 대화. */
+    var basicModeReason by mutableStateOf<String?>(null)
+        private set
+    var outcome by mutableStateOf<Outcome?>(null)
+        private set
 
     private val handler = Handler(Looper.getMainLooper())
-    private val topic = Scripts.debateTopic(LocalDate.now())
+    private val startedAt = System.currentTimeMillis()
+    private val pack = ContentPack.load(context)
+    private val brain = TalkBrain(
+        context,
+        ConversationEngine(pack.debateQuestion(LocalDate.now())) { SystemClock.elapsedRealtime() },
+        pack,
+        test,
+    )
     private val afterSpeech = mutableMapOf<String, () -> Unit>()
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -142,10 +162,13 @@ class TalkSession(
         if (began || !ttsReady || phase != Phase.PREPARING) return
         began = true
         EventLog.add(context, "${prefix}첫 문장 재생 시작")
-        say(Scripts.opening(topic)) { listen() }
+        val opening = pack.opening(ZonedDateTime.now())
+        brain.engine.addApp(opening)
+        updateBasicMode()
+        say(opening) { listen() }
     }
 
-    private fun say(text: String, locale: Locale = Locale.US, then: () -> Unit) {
+    private fun say(text: String, locale: Locale = localeFor(text), then: () -> Unit) {
         if (phase == Phase.ENDED) return
         phase = Phase.SPEAKING
         lines += Line(fromApp = true, text = text)
@@ -290,7 +313,7 @@ class TalkSession(
         }
         if (VoiceCommands.isKoreanHelpRequest(raw, detectedKorean)) {
             recognizer?.cancel()
-            onKoreanHelp()
+            onKoreanHelp(raw)
             return
         }
         val segment = VoiceCommands.parseSegment(raw)
@@ -315,32 +338,64 @@ class TalkSession(
         if (text.isBlank()) onNoAnswer() else onUserSaid(text)
     }
 
-    private fun onKoreanHelp() {
+    private fun onKoreanHelp(raw: String) {
         handler.removeCallbacks(silenceTimeout)
         handler.removeCallbacks(turnFallback)
         partial = ""
         turn.clear()
         EventLog.add(context, "${prefix}한국어 도움 요청")
-        say(Scripts.KOREAN_HELP_TOPIC, Locale.KOREAN) {
-            lines += Line(fromApp = true, text = Scripts.KOREAN_HELP_EXAMPLE)
-            say(Scripts.BACK_TO_ENGLISH) { listen() }
-        }
+        lines += Line(fromApp = false, text = raw)
+        askBrain(raw, koreanHelp = true)
     }
 
     private fun onUserSaid(text: String) {
         partial = ""
+        reprompted = false
         lines += Line(fromApp = false, text = text)
-        EventLog.add(context, "${prefix}사용자 대답 인식")
-        say(Scripts.stage2Reply(text)) { finish(Outcome.ANSWERED) }
+        askBrain(text, koreanHelp = false)
+    }
+
+    private fun askBrain(text: String, koreanHelp: Boolean) {
+        phase = Phase.THINKING
+        brain.reply(text, koreanHelp) { reply -> handler.post { onReply(reply) } }
+    }
+
+    private fun onReply(reply: TalkBrain.Reply) {
+        if (phase == Phase.ENDED) return
+        updateBasicMode()
+        reply.koreanHintOnScreen?.let { lines += Line(fromApp = true, text = it, hint = true) }
+        say(reply.text) {
+            if (reply.phase == ConversationEngine.Phase.WRAP_UP) summarizeAndFinish() else listen()
+        }
+    }
+
+    private fun updateBasicMode() {
+        basicModeReason = brain.fallbackReason?.userMessage
+    }
+
+    private fun summarizeAndFinish() {
+        if (phase == Phase.ENDED) return
+        phase = Phase.SUMMARIZING
+        brain.summarize { result ->
+            handler.post {
+                summary = result
+                finish(Outcome.ANSWERED)
+            }
+        }
     }
 
     private fun onNoAnswer() {
         partial = ""
+        val started = brain.engine.learnerTurns > 0
         if (!reprompted) {
             reprompted = true
-            say(Scripts.REPROMPT) { listen() }
+            val seed = LocalDate.now().dayOfYear
+            say(if (started) Scripts.REPROMPT_MID_TALK else pack.pick(pack.reprompts, seed)) { listen() }
         } else {
-            say(Scripts.GOODBYE_NO_ANSWER) { finish(Outcome.NO_ANSWER) }
+            val now = ZonedDateTime.now()
+            val laterToday = SchedulePolicy.retryAfter(now, null).toLocalDate() == now.toLocalDate()
+            val goodbye = pack.pick(if (laterToday) pack.goodbyeRetry else pack.goodbyeTomorrow, now.hour)
+            say(goodbye) { finish(Outcome.NO_ANSWER) }
         }
     }
 
@@ -349,9 +404,17 @@ class TalkSession(
         vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 600, 400, 600, 400, 600), -1))
     }
 
-    fun finish(outcome: Outcome) {
+    fun finish(requested: Outcome) {
         if (phase == Phase.ENDED) return
+        // 완료 기준(5분 또는 8왕복)을 채운 뒤 패스·이탈·무응답으로 끝나도 오늘 회차는 완료로 본다.
+        val outcome = if (!requested.completesToday && requested != Outcome.ERROR && brain.engine.isComplete()) {
+            Outcome.ANSWERED
+        } else {
+            requested
+        }
+        this.outcome = outcome
         phase = Phase.ENDED
+        brain.shutdown()
         handler.removeCallbacksAndMessages(null)
         afterSpeech.clear()
         recognizer?.destroy()
@@ -360,8 +423,30 @@ class TalkSession(
         tts?.shutdown()
         tts = null
         record(outcome)
+        saveRecord(outcome)
         onEnded(outcome)
     }
+
+    private fun saveRecord(outcome: Outcome) {
+        if (brain.engine.learnerTurns == 0 && lines.none { !it.fromApp }) return
+        runCatching {
+            SessionStore.append(
+                context,
+                SessionRecord(
+                    startedAt = startedAt,
+                    test = test,
+                    outcome = outcome.label,
+                    topic = brain.engine.chosenTopic,
+                    aiMode = brain.aiMode,
+                    lines = lines.filter { !it.hint }.map { !it.fromApp to it.text },
+                    corrections = summary?.corrections.orEmpty(),
+                    praise = summary?.praise,
+                ),
+            )
+        }.onFailure { EventLog.add(context, "${prefix}기록 저장 실패") }
+    }
+
+    private fun localeFor(text: String): Locale = if (hangul.containsMatchIn(text)) Locale.KOREAN else Locale.US
 
     private fun record(outcome: Outcome) {
         EventLog.add(context, "${prefix}세션 종료: ${outcome.label}")
@@ -378,6 +463,7 @@ class TalkSession(
     }
 
     companion object {
+        private val hangul = Regex("[\uAC00-\uD7A3]")
         const val ANSWER_WAIT_MS = 8_000L
         const val TAP_TIMEOUT_MS = 30_000L
         /** 말을 시작한 뒤 끝 신호 없이 이만큼 조용하면 대답으로 넘긴다. */
