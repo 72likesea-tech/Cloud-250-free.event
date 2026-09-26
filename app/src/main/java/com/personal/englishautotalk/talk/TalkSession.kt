@@ -78,6 +78,7 @@ class TalkSession(
 
     fun start() {
         if (DeviceState.isMediaMuted(context)) notice = "미디어 볼륨이 0이라 소리가 들리지 않습니다"
+        if (DeviceState.isTotalSilence(context)) notice = "방해금지 '완전 무음'이라 소리가 나지 않습니다. 자막을 보세요"
         tts = TextToSpeech(context) { status -> handler.post { onTtsInit(status) } }
         if (mode == TalkMode.DND) {
             vibrate()

@@ -26,6 +26,11 @@ object DeviceState {
         return if (audio.ringerMode == AudioManager.RINGER_MODE_NORMAL) RingMode.NORMAL else RingMode.SILENT
     }
 
+    /** 방해금지 '완전 무음'은 통화 외 모든 소리를 막아 음성이 나오지 않는다. */
+    fun isTotalSilence(context: Context) =
+        context.getSystemService(NotificationManager::class.java).currentInterruptionFilter ==
+            NotificationManager.INTERRUPTION_FILTER_NONE
+
     fun hasPermission(context: Context, permission: String) =
         context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 

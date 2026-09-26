@@ -4,6 +4,7 @@
 
 - 요구사항: [`requirements.md`](requirements.md)
 - 원본 문서: [`docs/work-order.md`](docs/work-order.md), [`docs/ai-role-prompts.md`](docs/ai-role-prompts.md)
+- 대화 콘텐츠: [`docs/content/`](docs/content) · Gemini 엔진 조사·사양: [`docs/gemini/`](docs/gemini)
 - 현재 단계 검수 안내: [`docs/stage2-test-guide.md`](docs/stage2-test-guide.md)
 
 ## 빌드
