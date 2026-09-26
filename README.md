@@ -2,6 +2,7 @@
 
 매일 정해진 시각에 휴대폰이 먼저 영어로 말을 걸어 대화 연습을 시키는 개인용 Android 앱.
 
+- **인계 문서: [`HANDOFF.md`](HANDOFF.md)** — 새 세션은 여기부터
 - 요구사항: [`requirements.md`](requirements.md)
 - 원본 문서: [`docs/work-order.md`](docs/work-order.md), [`docs/ai-role-prompts.md`](docs/ai-role-prompts.md)
 - 대화 콘텐츠: [`docs/content/`](docs/content) · Gemini 엔진 조사·사양: [`docs/gemini/`](docs/gemini)
