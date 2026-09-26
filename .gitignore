@@ -1,0 +1,10 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+# 릴리스 서명 키는 저장소에 넣지 않는다 (5단계에서 사용자가 별도 보관)
+*.jks
+release.keystore

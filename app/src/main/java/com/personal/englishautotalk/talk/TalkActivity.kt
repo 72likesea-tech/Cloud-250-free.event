@@ -1,0 +1,189 @@
+package com.personal.englishautotalk.talk
+
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.personal.englishautotalk.schedule.AlarmScheduler
+import com.personal.englishautotalk.ui.AppTheme
+
+/** 잠금화면 위에 뜨는 대화 화면. 잠금 해제 없이 동작한다. */
+class TalkActivity : ComponentActivity() {
+
+    private var session: TalkSession? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private val interruptCheck = Runnable { session?.interrupt() }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        enableEdgeToEdge()
+        TalkNotifier.cancel(this)
+
+        val mode = TalkMode.valueOf(intent.getStringExtra(EXTRA_MODE) ?: TalkMode.NORMAL.name)
+        val test = intent.getBooleanExtra(AlarmScheduler.EXTRA_TEST, true)
+        val s = TalkSession(applicationContext, mode, test) {
+            handler.postDelayed({ finish() }, CLOSE_DELAY_MS)
+        }
+        session = s
+        setContent { AppTheme { TalkScreen(s) } }
+        s.start()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // 이미 진행 중인 회차가 있으면 새 요청으로 중복 세션을 만들지 않는다.
+        TalkNotifier.cancel(this)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        handler.removeCallbacks(interruptCheck)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // 잠금화면 전환 중 잠깐 onStop이 올 수 있어, 잠시 뒤에도 화면 밖이면 중단으로 본다.
+        if (!isChangingConfigurations) handler.postDelayed(interruptCheck, INTERRUPT_GRACE_MS)
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        if (!isChangingConfigurations) session?.interrupt()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val EXTRA_MODE = "mode"
+        private const val CLOSE_DELAY_MS = 3_000L
+        private const val INTERRUPT_GRACE_MS = 1_500L
+
+        fun intent(context: Context, mode: TalkMode, test: Boolean): Intent =
+            Intent(context, TalkActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(EXTRA_MODE, mode.name)
+                .putExtra(AlarmScheduler.EXTRA_TEST, test)
+    }
+}
+
+@Composable
+private fun TalkScreen(session: TalkSession) {
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        if (session.phase == Phase.WAITING_TAP) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { session.onTapToStart() }
+                    .safeDrawingPadding()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "영어 말걸기 시간이에요\n\n화면을 터치하면 시작합니다",
+                    fontSize = 30.sp,
+                    lineHeight = 40.sp,
+                    textAlign = TextAlign.Center,
+                )
+                Column(Modifier.align(Alignment.BottomCenter)) {
+                    ActionButtons(session)
+                }
+            }
+            return@Surface
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .safeDrawingPadding()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = when (session.phase) {
+                    Phase.PREPARING -> "준비 중…"
+                    Phase.SPEAKING -> "🔊 말하는 중"
+                    Phase.LISTENING -> "🎤 듣는 중 — 영어로 대답하세요"
+                    Phase.ENDED -> "종료"
+                    Phase.WAITING_TAP -> ""
+                },
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            session.notice?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 18.sp)
+            }
+            val listState = rememberLazyListState()
+            LaunchedEffect(session.lines.size) {
+                if (session.lines.isNotEmpty()) listState.animateScrollToItem(session.lines.size - 1)
+            }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                items(session.lines) { line ->
+                    Text(
+                        text = if (line.fromApp) line.text else "You: ${line.text}",
+                        fontSize = 28.sp,
+                        lineHeight = 36.sp,
+                        color = if (line.fromApp) MaterialTheme.colorScheme.onBackground
+                        else MaterialTheme.colorScheme.primary,
+                    )
+                }
+                if (session.partial.isNotBlank()) {
+                    item { Text("You: ${session.partial}…", fontSize = 24.sp, color = MaterialTheme.colorScheme.outline) }
+                }
+            }
+            ActionButtons(session)
+        }
+    }
+}
+
+@Composable
+private fun ActionButtons(session: TalkSession) {
+    if (session.phase == Phase.ENDED) return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Button(onClick = { session.pass() }, modifier = Modifier.weight(1f).height(72.dp)) {
+            Text("패스\n(1시간 뒤)", fontSize = 20.sp, textAlign = TextAlign.Center)
+        }
+        OutlinedButton(onClick = { session.skipToday() }, modifier = Modifier.weight(1f).height(72.dp)) {
+            Text("오늘은 그만", fontSize = 20.sp)
+        }
+    }
+}
