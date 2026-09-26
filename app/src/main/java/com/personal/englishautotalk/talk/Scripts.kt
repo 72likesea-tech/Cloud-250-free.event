@@ -25,6 +25,16 @@ object Scripts {
 
     const val REPROMPT = "Are you there? No rush. Just say work, travel, or today's question."
 
+    /** "Help me in Korean" 또는 한국어로 말했을 때(주제 고르기 단계). 3단계에서는 Gemini가 상황에 맞게 만든다. */
+    const val KOREAN_HELP_TOPIC =
+        "도와드릴게요. 오늘 이야기할 주제를 영어로 하나 골라 주세요. " +
+            "일은 워크, 여행은 트래블, 아니면 오늘의 토론 질문이에요. " +
+            "다 말하면 오버 투 유 라고 해 주세요."
+
+    const val KOREAN_HELP_EXAMPLE = "예: Let's talk about travel. Over to you."
+
+    const val BACK_TO_ENGLISH = "Okay, now try it in English. Take your time."
+
     const val GOODBYE_NO_ANSWER = "Okay, looks like you're busy right now. I'll try again in an hour!"
 
     fun stage2Reply(heard: String) =

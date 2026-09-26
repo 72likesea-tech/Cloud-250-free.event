@@ -3,10 +3,10 @@ package com.personal.englishautotalk.talk
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.speech.RecognitionListener
@@ -44,6 +44,7 @@ data class Line(val fromApp: Boolean, val text: String)
 /**
  * 한 번의 말걸기 흐름: (방해금지면 터치 대기) → 첫 문장 음성 → 자동 듣기 →
  * 8초 무응답이면 1회 다시 말걸기 → 그래도 없으면 종료.
+ * 사용자 차례는 "I'm all set"/"Over to you"로 끝나고, "Help me in Korean"이나 한국어로 말하면 한국어로 돕는다.
  * 모든 상태 변경은 메인 스레드에서 한다.
  */
 class TalkSession(
@@ -70,7 +71,8 @@ class TalkSession(
     private var began = false
     private var reprompted = false
     private var heardSpeech = false
-    private var listenStartedAt = 0L
+    private var detectedKorean = false
+    private val turn = mutableListOf<String>()
 
     private val prefix get() = if (test) "[테스트] " else ""
 
@@ -142,15 +144,26 @@ class TalkSession(
         say(Scripts.opening(topic)) { listen() }
     }
 
-    private fun say(text: String, then: () -> Unit) {
+    private fun say(text: String, locale: Locale = Locale.US, then: () -> Unit) {
         if (phase == Phase.ENDED) return
         phase = Phase.SPEAKING
         lines += Line(fromApp = true, text = text)
+        val engine = tts ?: return
+        val result = engine.setLanguage(locale)
+        if (locale != Locale.US &&
+            (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED)
+        ) {
+            // 한국어 음성이 없으면 화면 표시만 하고 흐름은 이어간다.
+            notice = "한국어 음성 데이터가 없어 화면에만 표시합니다"
+            handler.post(then)
+            return
+        }
         val id = "u${++utteranceSeq}"
         afterSpeech[id] = then
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
     }
 
+    /** 사용자 차례 시작. 끝 신호(I'm all set / Over to you)가 나올 때까지 여러 구간을 이어 듣는다. */
     private fun listen() {
         if (phase == Phase.ENDED) return
         if (!DeviceState.canRecordAudio(context)) {
@@ -165,29 +178,57 @@ class TalkSession(
         }
         phase = Phase.LISTENING
         heardSpeech = false
+        detectedKorean = false
         partial = ""
-        listenStartedAt = SystemClock.elapsedRealtime()
+        turn.clear()
         startRecognizer()
         handler.postDelayed(silenceTimeout, ANSWER_WAIT_MS)
     }
 
     private fun startRecognizer() {
+        if (phase != Phase.LISTENING) return
         val r = recognizer ?: SpeechRecognizer.createSpeechRecognizer(context).also {
             it.setRecognitionListener(listener)
             recognizer = it
         }
-        r.startListening(
-            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
-                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true),
-        )
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+            .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        if (Build.VERSION.SDK_INT >= 34) {
+            // 한국어로 말하면 한국어 도움으로 처리하기 위해 언어 감지를 요청한다(인식기가 지원할 때만 동작).
+            val languages = arrayListOf("en-US", "ko-KR")
+            intent.putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
+                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, languages)
+                .putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH, RecognizerIntent.LANGUAGE_SWITCH_BALANCED)
+                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, languages)
+        }
+        r.startListening(intent)
+    }
+
+    /** 인식기가 한 구간을 끝낸 뒤 곧바로 다시 켜면 BUSY가 날 수 있어 잠깐 쉬고 다시 듣는다. */
+    private fun restartRecognizer() {
+        handler.postDelayed({ startRecognizer() }, RESTART_DELAY_MS)
+    }
+
+    private fun rearmNoAnswerWait() {
+        heardSpeech = false
+        handler.removeCallbacks(silenceTimeout)
+        handler.postDelayed(silenceTimeout, ANSWER_WAIT_MS)
     }
 
     private val silenceTimeout = Runnable {
-        if (phase == Phase.LISTENING && !heardSpeech) {
+        if (phase == Phase.LISTENING && !heardSpeech && turn.isEmpty()) {
             recognizer?.cancel()
             onNoAnswer()
+        }
+    }
+
+    /** 말을 시작했는데 끝 신호 없이 오래 조용하면, 들은 데까지를 대답으로 넘긴다. */
+    private val turnFallback = Runnable {
+        if (phase == Phase.LISTENING && turn.isNotEmpty()) {
+            EventLog.add(context, "${prefix}끝 신호 없이 ${TURN_FALLBACK_MS / 1000}초 조용함 — 대답으로 처리")
+            submitTurn()
         }
     }
 
@@ -196,41 +237,92 @@ class TalkSession(
         override fun onBeginningOfSpeech() {
             heardSpeech = true
             handler.removeCallbacks(silenceTimeout)
+            handler.removeCallbacks(turnFallback)
         }
         override fun onRmsChanged(rmsdB: Float) = Unit
         override fun onBufferReceived(buffer: ByteArray?) = Unit
         override fun onEndOfSpeech() = Unit
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
 
+        override fun onLanguageDetection(results: Bundle) {
+            val language = results.getString(SpeechRecognizer.DETECTED_LANGUAGE).orEmpty()
+            if (language.startsWith("ko")) detectedKorean = true
+        }
+
         override fun onPartialResults(partialResults: Bundle?) {
             partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                ?.firstOrNull()?.let { partial = it }
+                ?.firstOrNull()?.let { partial = (turn + it).joinToString(" ") }
         }
 
         override fun onResults(results: Bundle?) {
             if (phase != Phase.LISTENING) return
-            handler.removeCallbacks(silenceTimeout)
-            val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-            if (text.isNullOrBlank()) onNoAnswer() else onUserSaid(text)
+            val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+            onSegment(text)
         }
 
         override fun onError(error: Int) {
             if (phase != Phase.LISTENING) return
-            val elapsed = SystemClock.elapsedRealtime() - listenStartedAt
             val silence = error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || error == SpeechRecognizer.ERROR_NO_MATCH
-            if (silence && !heardSpeech && elapsed < ANSWER_WAIT_MS) {
-                // 인식기 자체 무음 제한이 8초보다 짧을 수 있어, 8초가 찰 때까지 다시 듣는다.
-                startRecognizer()
-                return
-            }
-            handler.removeCallbacks(silenceTimeout)
             if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                 notice = "마이크 권한이 없어 대답을 들을 수 없습니다"
                 finish(Outcome.ERROR)
                 return
             }
-            if (!silence) notice = "음성 인식 오류 (코드 $error)"
-            onNoAnswer()
+            if (silence || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                // 소리는 났지만 알아듣지 못한 경우: 무응답 대기를 다시 시작한다.
+                if (turn.isEmpty() && heardSpeech) rearmNoAnswerWait()
+                // 인식기 자체 무음 제한이 짧아도 8초 무응답·끝 신호 대기가 유지되도록 다시 듣는다.
+                restartRecognizer()
+                return
+            }
+            handler.removeCallbacks(silenceTimeout)
+            notice = "음성 인식 오류 (코드 $error)"
+            if (turn.isNotEmpty()) submitTurn() else onNoAnswer()
+        }
+    }
+
+    private fun onSegment(raw: String) {
+        if (raw.isBlank()) {
+            if (turn.isEmpty() && heardSpeech) rearmNoAnswerWait()
+            restartRecognizer()
+            return
+        }
+        if (VoiceCommands.isKoreanHelpRequest(raw, detectedKorean)) {
+            recognizer?.cancel()
+            onKoreanHelp()
+            return
+        }
+        val segment = VoiceCommands.parseSegment(raw)
+        if (segment.text.isNotBlank()) turn += segment.text
+        partial = turn.joinToString(" ")
+        if (segment.endOfTurn) {
+            submitTurn()
+        } else {
+            handler.removeCallbacks(turnFallback)
+            if (turn.isNotEmpty()) handler.postDelayed(turnFallback, TURN_FALLBACK_MS)
+            restartRecognizer()
+        }
+    }
+
+    private fun submitTurn() {
+        handler.removeCallbacks(silenceTimeout)
+        handler.removeCallbacks(turnFallback)
+        recognizer?.cancel()
+        val text = turn.joinToString(" ").trim()
+        turn.clear()
+        partial = ""
+        if (text.isBlank()) onNoAnswer() else onUserSaid(text)
+    }
+
+    private fun onKoreanHelp() {
+        handler.removeCallbacks(silenceTimeout)
+        handler.removeCallbacks(turnFallback)
+        partial = ""
+        turn.clear()
+        EventLog.add(context, "${prefix}한국어 도움 요청")
+        say(Scripts.KOREAN_HELP_TOPIC, Locale.KOREAN) {
+            lines += Line(fromApp = true, text = Scripts.KOREAN_HELP_EXAMPLE)
+            say(Scripts.BACK_TO_ENGLISH) { listen() }
         }
     }
 
@@ -287,5 +379,8 @@ class TalkSession(
     companion object {
         const val ANSWER_WAIT_MS = 8_000L
         const val TAP_TIMEOUT_MS = 30_000L
+        /** 말을 시작한 뒤 끝 신호 없이 이만큼 조용하면 대답으로 넘긴다. */
+        const val TURN_FALLBACK_MS = 20_000L
+        private const val RESTART_DELAY_MS = 250L
     }
 }

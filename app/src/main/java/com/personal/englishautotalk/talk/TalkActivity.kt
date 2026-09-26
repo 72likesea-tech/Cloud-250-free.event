@@ -142,6 +142,11 @@ private fun TalkScreen(session: TalkSession) {
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
+            Text(
+                "말을 마치면: \"I'm all set\" 또는 \"Over to you\"  ·  한국어 도움: \"Help me in Korean\"",
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.outline,
+            )
             session.notice?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 18.sp)
             }

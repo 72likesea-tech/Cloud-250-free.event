@@ -336,5 +336,17 @@
       "better": "더 자연스러운 표현",
       "note_ko": "한국어 한 줄 설명"
     }
+  },
+  "voice_commands": {
+    "end_of_turn": [
+      "I'm all set",
+      "Over to you"
+    ],
+    "end_of_turn_note": "사용자가 이 말을 할 때까지 한 차례로 이어서 듣는다. 신호는 대답 텍스트에서 제거한다. 20초 무음 시 안전장치로 제출.",
+    "korean_help": [
+      "Help me in Korean",
+      "(한국어로 말하기)"
+    ],
+    "korean_help_note": "한국어 도움은 짧게(2문장 이내) 한국어 음성+화면으로, 영어 예문 1개를 주고 다시 영어로 유도한다."
   }
 }
