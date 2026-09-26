@@ -1,0 +1,340 @@
+{
+  "version": 1,
+  "source": "Claude가 GPT 담당 작업 1·3을 대신 작성 (2026-09-26). docs/content/ 참고.",
+  "persona": {
+    "name": "Mia",
+    "style": "friendly coworker-like conversation partner; warm, casual, light humor; short sentences"
+  },
+  "placeholder": "{debate_question}",
+  "openers": {
+    "first_attempt": [
+      "Hi there! It's English time. Pick one for today: work, travel, or this question: {debate_question}",
+      "Good afternoon! Let's warm up your English. We can talk about work, travel, or this: {debate_question}",
+      "Hey, it's me again! Time for a quick chat. Work, travel, or this one: {debate_question}",
+      "Hello! Just five minutes of English, I promise. Work, travel, or this question: {debate_question}",
+      "Hi! I hope your day is going well. Let's talk about work, travel, or this question: {debate_question}",
+      "Hey there! It's coffee break English time. Your choice: work, travel, or this one: {debate_question}",
+      "Hi! I'm here for our daily chat. Tell me: work, travel, or this question: {debate_question}",
+      "Good afternoon! A short English chat keeps your brain fresh. Work, travel, or this: {debate_question}",
+      "Hello again! Let's speak some English. Pick work, travel, or today's question: {debate_question}",
+      "Hi! Quick English break. We can talk about your work, a trip, or this question: {debate_question}",
+      "Hey! Let's get talking. Work, travel, or something to debate: {debate_question}",
+      "Hi there! Ready or not, it's English time. Work, travel, or this question: {debate_question}",
+      "Good afternoon! Let's practice a little. Choose work, travel, or this one: {debate_question}",
+      "Hello! Your English buddy is here. Work, travel, or today's big question: {debate_question}",
+      "Hi! Take a deep breath and let's chat. Work, travel, or this question: {debate_question}",
+      "Hey! Short chat, big progress. Pick work, travel, or this one: {debate_question}",
+      "Hi! Let's make your afternoon a bit more English. Work, travel, or this: {debate_question}",
+      "Hello! Time to speak some English out loud. Work, travel, or this question: {debate_question}",
+      "Hi there! Just you and me, a few minutes of English. Work, travel, or this one: {debate_question}",
+      "Hey, good to hear from you! Let's chat. Work, travel, or today's question: {debate_question}"
+    ],
+    "retry": [
+      {
+        "text": "Hi again! Looks like you were busy earlier. Let's try now: work, travel, or this question: {debate_question}",
+        "hours": [
+          15,
+          20
+        ]
+      },
+      {
+        "text": "Knock knock, I'm back for our chat! Work, travel, or this one: {debate_question}",
+        "hours": [
+          15,
+          20
+        ]
+      },
+      {
+        "text": "Hey, second try! No pressure, just a few minutes. Work, travel, or this question: {debate_question}",
+        "hours": [
+          15,
+          15
+        ]
+      },
+      {
+        "text": "Hi! I didn't want you to miss today's English. Work, travel, or this: {debate_question}",
+        "hours": [
+          15,
+          20
+        ]
+      },
+      {
+        "text": "Hello again! Maybe now is a better time. Pick work, travel, or this question: {debate_question}",
+        "hours": [
+          15,
+          20
+        ]
+      },
+      {
+        "text": "Hi! It's me, your English buddy, one more time. Work, travel, or today's question: {debate_question}",
+        "hours": [
+          16,
+          20
+        ]
+      },
+      {
+        "text": "Hey! Let's squeeze in a quick chat before the day ends. Work, travel, or this one: {debate_question}",
+        "hours": [
+          17,
+          20
+        ]
+      },
+      {
+        "text": "Hi there! Still here and ready to talk. Work, travel, or this question: {debate_question}",
+        "hours": [
+          15,
+          20
+        ]
+      },
+      {
+        "text": "Good evening! Let's end the day with a little English. Work, travel, or this: {debate_question}",
+        "hours": [
+          18,
+          20
+        ]
+      },
+      {
+        "text": "Hi! This is my last try today, so let's chat now. Work, travel, or this one: {debate_question}",
+        "hours": [
+          20,
+          20
+        ]
+      }
+    ],
+    "weekend": [
+      "Happy weekend! Let's have a relaxed English chat. Work, travel, or this question: {debate_question}",
+      "Hi! It's the weekend, so let's keep it easy. Your week at work, a trip, or this one: {debate_question}",
+      "Hey! Lazy weekend English time. Work, travel, or this question: {debate_question}",
+      "Good afternoon! Weekends are perfect for a chat. Pick work, travel, or this: {debate_question}",
+      "Hi there! No work rush today, just English. Work, travel, or this question: {debate_question}",
+      "Hello! Let's talk like friends on a weekend. Work, travel, or this one: {debate_question}",
+      "Hi! A little English makes a great weekend. Work, travel, or today's question: {debate_question}",
+      "Hey! Weekend plans can wait five minutes. Work, travel, or this question: {debate_question}",
+      "Hi! Let's chat about your week, your trips, or this question: {debate_question}",
+      "Happy weekend! Let's speak some English. Work, travel, or this: {debate_question}"
+    ]
+  },
+  "debate_questions": [
+    {
+      "id": "dq01",
+      "category": "work",
+      "text": "Should companies adopt a four-day work week?"
+    },
+    {
+      "id": "dq02",
+      "category": "work",
+      "text": "Is working from home better than working in an office?"
+    },
+    {
+      "id": "dq03",
+      "category": "work",
+      "text": "Should people be allowed to use their phones during meetings?"
+    },
+    {
+      "id": "dq04",
+      "category": "work",
+      "text": "Is it better to work for a big company or a small startup?"
+    },
+    {
+      "id": "dq05",
+      "category": "work",
+      "text": "Should bosses and employees be friends on social media?"
+    },
+    {
+      "id": "dq06",
+      "category": "work",
+      "text": "Is it okay to check work emails on weekends?"
+    },
+    {
+      "id": "dq07",
+      "category": "work",
+      "text": "Should companies pay for their employees' English lessons?"
+    },
+    {
+      "id": "dq08",
+      "category": "work",
+      "text": "Is a high salary more important than a good boss?"
+    },
+    {
+      "id": "dq09",
+      "category": "tech",
+      "text": "Should AI be allowed to help make hiring decisions?"
+    },
+    {
+      "id": "dq10",
+      "category": "tech",
+      "text": "Will AI make our jobs easier or harder?"
+    },
+    {
+      "id": "dq11",
+      "category": "tech",
+      "text": "Should kids under sixteen be allowed on social media?"
+    },
+    {
+      "id": "dq12",
+      "category": "tech",
+      "text": "Is it a good idea to go one day a week without a smartphone?"
+    },
+    {
+      "id": "dq13",
+      "category": "tech",
+      "text": "Should self-driving cars be allowed on city roads?"
+    },
+    {
+      "id": "dq14",
+      "category": "tech",
+      "text": "Is online shopping better than shopping in stores?"
+    },
+    {
+      "id": "dq15",
+      "category": "society",
+      "text": "Is it better to live in a big city or a small town?"
+    },
+    {
+      "id": "dq16",
+      "category": "society",
+      "text": "Should public transportation be free in big cities?"
+    },
+    {
+      "id": "dq17",
+      "category": "society",
+      "text": "Is it worth paying more for eco-friendly products?"
+    },
+    {
+      "id": "dq18",
+      "category": "society",
+      "text": "Should cafes stop using single-use plastic cups?"
+    },
+    {
+      "id": "dq19",
+      "category": "society",
+      "text": "Is it better to cook at home or eat out?"
+    },
+    {
+      "id": "dq20",
+      "category": "society",
+      "text": "Should schools start later in the morning?"
+    },
+    {
+      "id": "dq21",
+      "category": "society",
+      "text": "Is it rude to talk on the phone on the subway?"
+    },
+    {
+      "id": "dq22",
+      "category": "society",
+      "text": "Should people retire at sixty?"
+    },
+    {
+      "id": "dq23",
+      "category": "society",
+      "text": "Is money the most important thing for happiness?"
+    },
+    {
+      "id": "dq24",
+      "category": "travel",
+      "text": "Is it better to travel alone or with friends?"
+    },
+    {
+      "id": "dq25",
+      "category": "travel",
+      "text": "Should tourists learn some of the local language before a trip?"
+    },
+    {
+      "id": "dq26",
+      "category": "travel",
+      "text": "Is a package tour better than planning a trip yourself?"
+    },
+    {
+      "id": "dq27",
+      "category": "travel",
+      "text": "Is one long vacation better than several short trips?"
+    },
+    {
+      "id": "dq28",
+      "category": "travel",
+      "text": "Should everyone live abroad at least once?"
+    },
+    {
+      "id": "dq29",
+      "category": "life",
+      "text": "Is it better to rent a home or buy one?"
+    },
+    {
+      "id": "dq30",
+      "category": "life",
+      "text": "Should pets be allowed in restaurants and cafes?"
+    }
+  ],
+  "no_answer": {
+    "reprompt": [
+      "Are you there? No rush. Just say work, travel, or today's question.",
+      "Take your time. Even one word is fine: work, travel, or the question.",
+      "Hmm, I didn't catch that. Which one sounds fun: work, travel, or today's question?",
+      "No worries if it's hard. Just pick one: work, travel, or the question.",
+      "I'm still here! Say anything you like, even just work or travel."
+    ],
+    "goodbye_retry": [
+      "Okay, looks like you're busy right now. I'll try again in an hour!",
+      "No problem, I'll let you go. Talk to you in an hour!",
+      "Seems like a busy moment. I'll come back a bit later!",
+      "That's okay! I'll check in again in about an hour.",
+      "All good, take care of what you're doing. See you in an hour!"
+    ],
+    "goodbye_tomorrow": [
+      "Okay, it's getting late. Let's talk tomorrow afternoon!",
+      "No problem at all. I'll see you tomorrow at two!",
+      "That's fine, rest well tonight. Talk to you tomorrow!"
+    ]
+  },
+  "korean_or_stuck_nudges": [
+    {
+      "en": "That's okay! Try it in English, just a few words. For example: I'm busy today.",
+      "hint_ko": "짧게라도 영어로 말해 보세요. 예: I'm busy today."
+    },
+    {
+      "en": "Good idea! Now let's say it in English. You can start with: I think...",
+      "hint_ko": "'I think...'(제 생각에는)로 시작해 보세요."
+    },
+    {
+      "en": "No problem. Let me make it easier: do you like it, yes or no?",
+      "hint_ko": "Yes나 No로만 답해도 괜찮아요."
+    },
+    {
+      "en": "I hear you! Try one English word first. Just one.",
+      "hint_ko": "먼저 영어 단어 하나만 말해 보세요."
+    },
+    {
+      "en": "That's fine! You can say: I'm not sure, but... and keep going.",
+      "hint_ko": "'잘 모르겠지만'은 I'm not sure, but... 이에요."
+    },
+    {
+      "en": "Nice try! In English, maybe: It was a long day. Now you try.",
+      "hint_ko": "제가 한 문장을 들려드렸어요. 따라 말해 보세요."
+    },
+    {
+      "en": "Don't worry about mistakes. Just say it simply, like texting a friend.",
+      "hint_ko": "틀려도 괜찮아요. 친구에게 문자하듯 쉽게 말해요."
+    },
+    {
+      "en": "Let's go smaller. Is your day good or bad so far?",
+      "hint_ko": "good 또는 bad 한 단어로 시작해 보세요."
+    },
+    {
+      "en": "Okay! Try this: I don't know much about it, but I think...",
+      "hint_ko": "'잘 모르지만 제 생각에는' = I don't know much about it, but I think..."
+    },
+    {
+      "en": "Almost there! Say it in English and I'll help you with it.",
+      "hint_ko": "영어로 말해 보시면 자연스럽게 다듬어 드릴게요."
+    }
+  ],
+  "session_summary_format": {
+    "count": 3,
+    "item": {
+      "said": "사용자가 실제로 한 말(인식 결과)",
+      "better": "더 자연스러운 표현",
+      "note_ko": "한국어 한 줄 설명"
+    }
+  }
+}

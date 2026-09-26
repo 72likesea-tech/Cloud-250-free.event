@@ -52,6 +52,8 @@
   - 대화 응답 모델: `gemini-2.5-flash-lite` [확정]
 - 저장: DataStore(설정·스케줄 상태) + Room(대화 기록).
 - 오프라인·한도 초과 시 기본 연습 콘텐츠(assets JSON, GPT 담당 산출물)로 전환.
+- 대화 콘텐츠: GPT 작업 1·3은 사용자 결정 (가)에 따라 Claude가 대신 작성 → `docs/content/task1-persona-openers.md`, `docs/content/task3-correction-rules.md`, 앱 데이터 `app/src/main/assets/content_pack.json`. 페르소나 Mia. [확정 — 2026-09-26]
+- Gemini 작업 A·B(무료 한도, Android 16 제약)는 Gemini API 키를 환경 API credentials에 연결한 뒤 새 세션에서 진행. [대기]
 
 ## ⑥ 무료 한도와 월 비용 상한
 - 목표 월 0원. 결제가 연결되지 않은 기존 Gemini 키 사용을 전제. [확정 — 0원 필수]
